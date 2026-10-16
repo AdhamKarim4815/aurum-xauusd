@@ -1,0 +1,113 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gold-trader"
+version = "0.1.0"
+description = "Mac-native XAUUSD research and paper-trading foundation"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "MIT" }
+authors = [{ name = "Adham Karim" }]
+dependencies = [
+  "alembic>=1.14,<2",
+  "defusedxml>=0.7,<1",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "itsdangerous>=2.2,<3",
+  "jinja2>=3.1,<4",
+  "joblib>=1.4,<2",
+  "keyring>=25.6,<26",
+  "numpy>=2.1,<3",
+  "pandas>=2.2,<3",
+  "plotly>=6,<7",
+  "pyarrow>=19,<24",
+  "pydantic>=2.10,<3",
+  "pydantic-settings>=2.7,<3",
+  "python-multipart>=0.0.20,<1",
+  "scikit-learn>=1.6,<2",
+  "sqlalchemy>=2.0,<3",
+  "structlog>=25,<26",
+  "typer>=0.15,<1",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+ml = [
+  "lightgbm>=4.6,<5",
+  "mlflow>=3,<4",
+  "optuna>=4.2,<5",
+  # 0.52.0 publishes an incompatible old numba/llvmlite pin for Python 3.12.
+  "shap==0.48.0",
+  "torch>=2.7,<3",
+  "transformers>=4.51,<5",
+]
+
+[dependency-groups]
+dev = [
+  "hypothesis>=6.127,<7",
+  "mypy>=1.15,<2",
+  "pandas-stubs>=2.2,<3",
+  "pytest>=8.3,<9",
+  "pytest-cov>=6,<7",
+  "ruff>=0.11,<1",
+]
+
+[project.scripts]
+gold-trader = "gold_trader.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gold_trader"]
+
+[tool.hatch.build]
+include = [
+  "src/gold_trader/**/*.py",
+  "src/gold_trader/templates/**",
+  "src/gold_trader/static/**",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers --disable-warnings -m 'not optional_ml'"
+testpaths = ["tests"]
+markers = ["optional_ml: requires the expanded local ML dependency set"]
+
+[tool.coverage.run]
+branch = true
+source = ["gold_trader"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["B008"]
+
+[tool.ruff.format]
+# These files are part of sealed research implementation hashes. Formatting them
+# would correctly invalidate an existing lineage, so new lineages must opt in
+# deliberately instead of changing them during a repository-wide format pass.
+exclude = [
+  "src/gold_trader/features.py",
+  "src/gold_trader/generation.py",
+  "src/gold_trader/generation4.py",
+  "src/gold_trader/generation5.py",
+  "src/gold_trader/generation6.py",
+  "src/gold_trader/live_paper.py",
+  "src/gold_trader/risk.py",
+  "src/gold_trader/simulator.py",
+  "src/gold_trader/strategies.py",
+  "src/gold_trader/worker.py",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["gold_trader"]
+exclude = ["migrations"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["defusedxml.*", "keyring.*", "plotly.*", "sklearn.*", "joblib.*"]
+ignore_missing_imports = true

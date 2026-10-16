@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero-grid">
+  <article class="panel market-panel">
+    <div class="panel-head">
+      <div><p class="eyebrow">PAPER ACCOUNT</p><h2 id="paper-equity">${{ '%.2f'|format(status.paper.equity|default(10000, true)) }}</h2></div>
+      <span class="muted">USD simulated equity</span>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="equity-chart" width="760" height="210" aria-label="Simulated paper equity over time"></canvas>
+      <p id="equity-empty" class="chart-empty" hidden>No paper trades observed yet — the curve fills in once a paper session starts recording equity.</p>
+    </div>
+    <div class="metric-row">
+      <div><small>Risk / trade</small><strong>0.50%</strong></div>
+      <div><small>Daily halt</small><strong>2.00%</strong></div>
+      <div><small>5-day halt</small><strong>5.00%</strong></div>
+      <div><small>Account lock</small><strong>10.00%</strong></div>
+    </div>
+  </article>
+
+  <article class="panel control-panel">
+    <p class="eyebrow">SYSTEM CONTROL</p>
+    <div class="control-status">
+      <span>Worker</span><strong id="paper-status">{{ status.paper.status or 'stopped' }}</strong>
+      <span>Feed</span><strong id="feed-status">{{ status.paper.feed_status or 'unconfigured' }}</strong>
+      <span>Sleep lease</span><strong id="sleep-status">{{ 'held' if status.paper.sleep_lease else 'released' }}</strong>
+      <span>Approval</span><strong id="approval-status">{{ status.approval.candidate_hash[:10] if status.approval else 'required' }}</strong>
+      <span>Mode</span><strong id="mode-status">{{ status.paper.mode or 'none' }}</strong>
+      <span>Quote age</span><strong id="quote-age">{{ '%.0f sec'|format(status.paper.quote_age_seconds) if status.paper.quote_age_seconds is defined else '—' }}</strong>
+      <span>Paper trades</span><strong id="paper-trades">{{ status.paper.observation_trade_count or 0 }}</strong>
+    </div>
+    <div class="provider-chain" id="provider-chain">
+      {% for entry in status.provider_chain %}
+      <span class="provider-chip {% if status.paper.live_provider == entry.name %}active{% elif not entry.configured %}unset{% endif %}" data-provider="{{ entry.name }}">
+        {{ entry.name }}{% if not entry.configured %} · no key{% endif %}
+      </span>
+      {% endfor %}
+    </div>
+    <div class="control-actions">
+      <form method="post" action="/api/paper/start">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="mode" value="replay">
+        <button class="primary" type="submit" {% if not status.approval or status.paper.kill_switch %}disabled{% endif %}>Start replay paper</button>
+      </form>
+      <form method="post" action="/api/paper/start">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="mode" value="live">
+        <button class="primary" type="submit" {% if not status.approval or status.paper.kill_switch %}disabled{% endif %}>Start continuous live paper</button>
+      </form>
+      <form method="post" action="/api/paper/stop">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Stop safely</button>
+      </form>
+    </div>
+    <form class="kill-form" method="post" action="/api/risk/kill" data-confirm="Activate the kill switch? This immediately halts paper trading and cannot be undone from here.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="reason" value="Operator activated from command center">
+      <button class="danger" type="submit">Activate kill switch</button>
+    </form>
+    {% if status.paper.kill_switch %}
+    <form method="post" action="/api/risk/reset">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Reset after review</button>
+    </form>
+    {% endif %}
+  </article>
+</section>
+
+<section class="lower-grid">
+  <article class="panel">
+    <div class="panel-head"><div><p class="eyebrow">RESEARCH GATE</p><h3>Candidate readiness</h3></div><a href="/research">Open lab →</a></div>
+    {% if status.research_runs %}
+      {% set run = status.research_runs[0] %}
+      <div class="candidate-line">
+        <div><strong>{{ run.variant_id|default(run.strategy_id) }}</strong><small>{{ run.timeframe }} · {{ run.candidate_hash[:12] }}</small></div>
+        <span class="status-pill {{ run.status }}">{{ run.status }}</span>
+      </div>
+      <div class="mini-metrics">
+        <span>Return <strong>{{ '%.2f'|format(run.metrics.net_return * 100) }}%</strong></span>
+        <span>PF <strong>{{ '%.2f'|format(run.metrics.profit_factor) }}</strong></span>
+        <span>Sharpe <strong>{{ '%.2f'|format(run.metrics.sharpe) }}</strong></span>
+        <span>DD <strong>{{ '%.2f'|format(run.metrics.max_drawdown * 100) }}%</strong></span>
+      </div>
+    {% else %}
+      <div class="empty-state"><strong>No evidence package yet</strong><p>Import XAUUSD bars and run a preregistered strategy from the CLI.</p></div>
+    {% endif %}
+  </article>
+  <article class="panel guardrail-panel">
+    <p class="eyebrow">NON-NEGOTIABLE</p><h3>Risk engine has final say.</h3>
+    <ul class="guardrails">
+      <li><span>01</span> One net XAUUSD position</li>
+      <li><span>02</span> Mandatory stop before sizing</li>
+      <li><span>03</span> No martingale, grid, or averaging down</li>
+      <li><span>04</span> Model scores can never bypass a rejection</li>
+    </ul>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Research{% endblock %}
+{% block heading %}Evidence laboratory{% endblock %}
+{% block content %}
+<section class="research-intro panel">
+  <div><p class="eyebrow">PROMOTION POLICY</p><h2>Evidence first. Approval second.</h2></div>
+  <p>Every lineage is bound to exact data, configuration, strategy, and model hashes. Changing one invalidates approval.</p>
+</section>
+<section class="run-list">
+{% for run in runs %}
+  <article class="panel run-card">
+    <div class="panel-head">
+      <div><p class="eyebrow">{{ run.timeframe }} CANDIDATE</p><h3>{{ run.variant_id|default(run.strategy_id) }}</h3><code>{{ run.candidate_hash }}</code></div>
+      <span class="status-pill {{ run.status }}">{{ run.status }}</span>
+    </div>
+    <div class="metric-row five">
+      <div><small>Net return</small><strong>{{ '%.2f'|format(run.metrics.net_return * 100) }}%</strong></div>
+      <div><small>Profit factor</small><strong>{{ '%.2f'|format(run.metrics.profit_factor) }}</strong></div>
+      <div><small>Sharpe</small><strong>{{ '%.2f'|format(run.metrics.sharpe) }}</strong></div>
+      <div><small>Max drawdown</small><strong>{{ '%.2f'|format(run.metrics.max_drawdown * 100) }}%</strong></div>
+      <div><small>Trades</small><strong>{{ run.metrics.trade_count|int }}</strong></div>
+    </div>
+    {% if run.ml_evidence %}
+    <div class="model-evidence">
+      <div><small>Model role</small><strong>Signal filter only</strong></div>
+      <div><small>Fixed threshold</small><strong>{{ '%.2f'|format(run.ml_evidence.threshold) }}</strong></div>
+      <div><small>Holdout events</small><strong>{{ run.ml_evidence.holdout_probability.events|int }}</strong></div>
+      <div><small>Brier skill</small><strong class="{{ 'pass' if run.ml_evidence.holdout_probability.brier_skill > 0 else 'fail' }}">{{ '%.3f'|format(run.ml_evidence.holdout_probability.brier_skill) }}</strong></div>
+      <div><small>ROC AUC</small><strong>{{ '%.3f'|format(run.ml_evidence.holdout_probability.roc_auc) }}</strong></div>
+      <div><small>Parent lineage</small><code>{{ run.parent_candidate_hash[:12] }}</code></div>
+    </div>
+    {% endif %}
+    <div class="gate-grid">
+      {% for gate, passed in run.gates.items() %}<span class="{{ 'pass' if passed else 'fail' }}">{{ '✓' if passed else '×' }} {{ gate|replace('_', ' ') }}</span>{% endfor %}
+    </div>
+    {% if run.eligible %}
+    <form class="approval-form" method="post" action="/api/candidates/{{ run.candidate_hash }}/approve">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <p><strong>Ready for paper approval.</strong><br><small>This button approves this exact immutable candidate version.</small></p>
+      <button class="primary" type="submit">Approve strategy</button>
+    </form>
+    {% endif %}
+  </article>
+{% else %}
+  <article class="panel empty-state"><strong>No research runs</strong><p>Use <code>gold-trader research run</code> after importing a dataset.</p></article>
+{% endfor %}
+</section>
+{% endblock %}

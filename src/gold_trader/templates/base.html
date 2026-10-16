@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Aurum is a local, safety-first XAUUSD research and paper-trading console.">
+  <title>{% block title %}Aurum{% endblock %} · XAUUSD Research</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v=paper-lab-1">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Aurum dashboard">
+        <span class="brand-mark">AU</span>
+        <span><strong>Aurum</strong><small>Research terminal</small></span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a class="{% if request.url.path == '/' %}active{% endif %}" href="/"><span>01</span> Command</a>
+        <a class="{% if request.url.path == '/research' %}active{% endif %}" href="/research"><span>02</span> Research</a>
+        <a class="{% if request.url.path == '/strategies' %}active{% endif %}" href="/strategies"><span>03</span> Strategies</a>
+        <a class="{% if request.url.path == '/paper-lab' %}active{% endif %}" href="/paper-lab"><span>04</span> Live lab</a>
+        <a class="{% if request.url.path == '/generation' %}active{% endif %}" href="/generation"><span>05</span> Generations</a>
+        <a class="{% if request.url.path == '/audit' %}active{% endif %}" href="/audit"><span>06</span> Audit trail</a>
+        <a class="{% if request.url.path == '/settings' %}active{% endif %}" href="/settings"><span>07</span> Settings</a>
+      </nav>
+      <div class="sidebar-foot">
+        <span class="pulse"></span>
+        <p>Local only<br><small>No live execution venue</small></p>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">XAU / USD · PAPER SYSTEM</p>
+          <h1>{% block heading %}Command center{% endblock %}</h1>
+        </div>
+        <div class="system-state">
+          {% set header_status = lab.status if request.url.path == '/paper-lab' else status.paper.status %}
+          <span id="header-status" class="status-pill {{ header_status or 'stopped' }}">{{ header_status or 'stopped' }}</span>
+          <span class="clock" id="utc-clock">UTC --:--:--</span>
+        </div>
+      </header>
+      {% block content %}{% endblock %}
+      <footer>
+        Simulation only. Data and fills can differ from any broker. No profitability is promised.
+      </footer>
+    </main>
+  </div>
+  <script src="{{ url_for('static', path='/app.js') }}?v=paper-lab-1" defer></script>
+</body>
+</html>

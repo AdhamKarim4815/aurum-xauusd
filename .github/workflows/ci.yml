@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run mypy src/gold_trader
+      - run: uv run pytest --cov=gold_trader --cov-fail-under=75
+        env:
+          # Headless runners have no OS keychain; tests never need real secrets.
+          PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
+

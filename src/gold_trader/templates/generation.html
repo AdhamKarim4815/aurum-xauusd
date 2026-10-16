@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block heading %}Research generations{% endblock %}
+{% block content %}
+<section class="research-intro">
+  <div><p class="eyebrow">LOCAL CPU RESEARCH</p><h2>Sealed, resumable strategy search</h2></div>
+  {% if generation and generation.generation_id.startswith('generation-6') %}
+  <p>Generation 6 tests new higher-activity state, momentum-consensus, RSI-recovery, and liquid-session hypotheses. It adaptively uses earlier evidence, so final and independent-source validation remain mandatory.</p>
+  {% elif generation and generation.generation_id.startswith('generation-5') %}
+  <p>Generation 5 uses pre-finalization discovery data and explicitly discloses adaptive reuse of the final period across lineages. Shortlists, final validation, and approval remain separate.</p>
+  {% else %}
+  <p>Each generation is evaluated before its lineage holdout. Shortlists appear under Strategies, but final validation and one-click approval remain separate.</p>
+  {% endif %}
+</section>
+
+{% if generations %}
+<nav class="generation-history" aria-label="Generation history">
+  {% for run in generations %}
+  <a href="/generation?generation_id={{ run.generation_id }}" class="{{ 'active' if generation and run.generation_id == generation.generation_id else '' }}">
+    <span>{{ run.generation_id }}</span>
+    <small>{{ run.status }} · {{ run.summary.completed_trials or 0 }} trials</small>
+  </a>
+  {% endfor %}
+</nav>
+{% endif %}
+
+<section class="panel">
+  {% if generation %}
+  <div class="panel-head">
+    <div><p class="eyebrow">{{ generation.generation_id }}</p><h3 id="generation-status">{{ generation.status }}</h3></div>
+    <code>{{ generation.manifest_hash[:18] }}</code>
+  </div>
+  <div class="metric-row five">
+    <div><small>Completed</small><strong id="generation-completed">{{ generation.summary.completed_trials or 0 }}</strong></div>
+    <div><small>Total</small><strong id="generation-total">{{ generation.summary.total_trials or 0 }}</strong></div>
+    <div><small>Shortlist</small><strong id="generation-shortlisted">{{ generation.summary.shortlisted or 0 }}</strong></div>
+    <div><small>Batches</small><strong id="generation-batches">{{ generation.summary.batches or 0 }}</strong></div>
+    <div><small>PBO estimate</small><strong id="generation-pbo">{{ '%.2f'|format(generation.summary.probability_of_backtest_overfit|default(1)) }}</strong></div>
+  </div>
+  <div class="control-actions generation-actions">
+    {% set is_g6 = generation.generation_id.startswith('generation-6') %}
+    {% set is_g5 = generation.generation_id.startswith('generation-5') %}
+    {% set is_g4 = generation.generation_id.startswith('generation-4') %}
+    {% set generation_api = '/api/generation6' if is_g6 else ('/api/generation5' if is_g5 else ('/api/generation4' if is_g4 else '/api/generation')) %}
+    {% set default_manifest = 'var/generations/generation-6.json' if is_g6 else ('var/generations/generation-5.json' if is_g5 else ('var/generations/generation-4.json' if is_g4 else 'var/generations/generation-3.json')) %}
+    <form method="post" action="{{ generation_api }}/start">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="manifest_path" value="{{ generation.summary.manifest_path|default(default_manifest) }}">
+      <button class="primary" type="submit">Start / resume locally</button>
+    </form>
+    <form method="post" action="{{ generation_api }}/pause">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Pause after batch</button>
+    </form>
+    <form method="post" action="{{ generation_api }}/stop">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Stop after batch</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <strong>No sealed generation yet</strong>
+    <p>Create and seal one with the CLI commands shown in the README.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="research-intro generation-list">
+  <div><p class="eyebrow">LEADERBOARD · {{ generation.generation_id if generation else 'NO GENERATION' }}</p><h2>Highest net return first</h2></div>
+  <p>These are discovery thresholds. Final approval is stricter and still requires every cost, drawdown, stability, selection-bias, untouched-holdout, and external-data gate.</p>
+</section>
+<section class="run-list">
+  {% for item in trials %}
+  <article class="panel run-card">
+    <div class="panel-head">
+      <div><p class="eyebrow">#{{ loop.index }} · {{ item.spec.family }}</p><h3>{{ item.result.status }}</h3></div>
+      <span>score {{ '%.4f'|format(item.result.score|default(0)) }}</span>
+    </div>
+    <code>{{ item.spec.trial_hash }}</code>
+    <div class="mini-metrics five">
+      <span>Return <strong>{{ '%.2f'|format(item.result.metrics.net_return|default(0) * 100) }}%</strong></span>
+      <span>2× cost return <strong>{% if item.result.stressed_metrics is defined %}{{ '%.2f'|format(item.result.stressed_metrics.net_return|default(0) * 100) }}%{% else %}Not run{% endif %}</strong></span>
+      <span>PF <strong>{{ '%.2f'|format(item.result.metrics.profit_factor|default(0)) }}</strong></span>
+      <span>Sharpe <strong>{{ '%.2f'|format(item.result.metrics.sharpe|default(0)) }}</strong></span>
+      <span>Trades <strong>{{ item.result.metrics.trade_count|default(0)|int }}</strong></span>
+    </div>
+    <div class="trial-verdict {{ 'failed' if item.result.evidence.failed_reasons else 'passed' }}">
+      <strong>
+        {% if item.result.status == 'pruned' %}Why it was pruned
+        {% elif item.result.evidence.failed_reasons %}Why it was rejected
+        {% else %}Discovery result{% endif %}
+      </strong>
+      <p>{{ item.result.evidence.summary }}</p>
+    </div>
+    <div class="trial-gates">
+      {% for gate in item.result.evidence.gates %}
+      <div class="trial-gate {{ 'pass' if gate.passed else 'fail' }}">
+        <span>{{ '✓' if gate.passed else '×' }} {{ gate.label }}</span>
+        <strong>{{ gate.actual }}</strong>
+        <small>Required {{ gate.requirement }}</small>
+      </div>
+      {% endfor %}
+    </div>
+    <details class="trial-parameters">
+      <summary>Strategy parameters</summary>
+      <div>
+        {% for key, value in item.spec.parameters|dictsort %}
+        <span><small>{{ key|replace('_', ' ') }}</small><strong>{{ value }}</strong></span>
+        {% endfor %}
+      </div>
+    </details>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

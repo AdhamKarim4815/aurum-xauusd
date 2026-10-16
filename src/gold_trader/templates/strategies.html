@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Strategies{% endblock %}
+{% block heading %}Strategy choices{% endblock %}
+{% block content %}
+<section class="research-intro panel">
+  <div><p class="eyebrow">PAPER STRATEGY LIBRARY</p><h2>Choose from every robust shortlist</h2></div>
+  <p>Generation 3 through Generation 6 shortlists are ranked by discovery return. A shortlist must pass final holdout and independent-source validation before the approval button appears.</p>
+</section>
+
+{% if status.approval %}
+<section class="panel approved-banner">
+  <div><p class="eyebrow">CURRENT PAPER APPROVAL</p><h3>Strategy approved</h3></div>
+  <code>{{ status.approval.candidate_hash }}</code>
+  <a href="/">Open paper controls →</a>
+</section>
+{% endif %}
+
+<section class="research-intro generation-list">
+  <div><p class="eyebrow">FINALIZED CANDIDATES</p><h2>One-click approval</h2></div>
+  <p>The button approves the exact candidate shown. Any later data, strategy, model, or configuration change invalidates that approval.</p>
+</section>
+<section class="run-list compact-list">
+{% for run in finalized_runs %}
+  {% set external_metrics = run.external_metrics|default({}) %}
+  <article class="panel finalized-choice">
+    <div>
+      <p class="eyebrow">{{ run.timeframe }} · FINAL VALIDATION</p>
+      <h3>{{ run.variant_id|default(run.strategy_id) }}</h3>
+      <code>{{ run.candidate_hash }}</code>
+    </div>
+    <div class="final-metrics">
+      <span><small>Holdout return</small><strong>{{ '%.2f'|format(run.metrics.net_return * 100) }}%</strong></span>
+      <span><small>External return</small><strong>{{ '%.2f'|format(external_metrics.net_return|default(0) * 100) }}%</strong></span>
+      <span><small>Holdout trades</small><strong>{{ run.metrics.trade_count|int }}</strong></span>
+    </div>
+    <a class="report-link" href="/api/reports/{{ run.candidate_hash }}" target="_blank" rel="noopener">View full report →</a>
+    {% if run.eligible and (not status.approval or status.approval.candidate_hash != run.candidate_hash) %}
+    <form method="post" action="/api/candidates/{{ run.candidate_hash }}/approve">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="primary" type="submit">Approve strategy</button>
+    </form>
+    {% elif run.eligible %}
+    <span class="status-pill eligible">Approved</span>
+    {% else %}
+    <div class="final-verdict">
+      <span class="status-pill ineligible">Ineligible</span>
+      <small>Failed: {% for gate, passed in run.gates.items() if not passed %}{{ gate|replace('_', ' ') }}{% if not loop.last %}, {% endif %}{% endfor %}</small>
+    </div>
+    {% endif %}
+  </article>
+{% else %}
+  <article class="panel empty-state"><strong>No finalized candidate yet</strong><p>Use a shortlist below and run final validation with an independent broker export.</p></article>
+{% endfor %}
+</section>
+
+<section class="research-intro generation-list">
+  <div><p class="eyebrow">DISCOVERY SHORTLISTS</p><h2>Generation 3 through Generation 6</h2></div>
+  <p>Highest net return first. These are choices for final validation, not permission to paper trade yet.</p>
+</section>
+<section class="strategy-grid">
+{% for item in choices %}
+  {% set finalized = finalizations_by_trial.get(item.spec.trial_hash) %}
+  {% set validation = validation_jobs_by_trial.get(item.spec.trial_hash) %}
+  <article class="panel choice-card">
+    <div class="panel-head">
+      <div><p class="eyebrow">#{{ loop.index }} · {{ item.generation_id }}</p><h3>{{ item.spec.family }}</h3></div>
+      <span class="status-pill eligible">shortlisted</span>
+    </div>
+    <code>{{ item.spec.trial_hash }}</code>
+    <div class="mini-metrics choice-metrics">
+      <span>Return <strong>{{ '%.2f'|format(item.result.metrics.net_return|default(0) * 100) }}%</strong></span>
+      <span>2× cost <strong>{{ '%.2f'|format(item.result.stressed_metrics.net_return|default(0) * 100) }}%</strong></span>
+      <span>PF <strong>{{ '%.2f'|format(item.result.metrics.profit_factor|default(0)) }}</strong></span>
+      <span>Sharpe <strong>{{ '%.2f'|format(item.result.metrics.sharpe|default(0)) }}</strong></span>
+    </div>
+    <p class="choice-note">{{ item.result.evidence.summary }}</p>
+    {% if finalized %}
+    {% set finalized_external = finalized.external_metrics|default({}) %}
+    <div class="validation-complete {{ 'pass' if finalized.eligible else 'fail' }}">
+      <strong>Final validation {{ 'passed' if finalized.eligible else 'did not pass' }}</strong>
+      <small>Holdout {{ '%.2f'|format(finalized.metrics.net_return * 100) }}% · External {{ '%.2f'|format(finalized_external.net_return|default(0) * 100) }}% · {{ finalized.metrics.trade_count|int }} holdout trades</small>
+      {% if not finalized.eligible %}<small>Failed: {% for gate, passed in finalized.gates.items() if not passed %}{{ gate|replace('_', ' ') }}{% if not loop.last %}, {% endif %}{% endfor %}</small>{% endif %}
+      <a class="report-link" href="/api/reports/{{ finalized.candidate_hash }}" target="_blank" rel="noopener">View full report →</a>
+    </div>
+    {% elif validation and validation.status in ['queued', 'running'] %}
+    <div class="validation-progress" data-validation-job data-trial-hash="{{ item.spec.trial_hash }}">
+      <div><strong data-validation-status>{{ validation.status|title }}</strong><span data-validation-percent>{{ validation.progress|default(0) }}%</span></div>
+      <div class="progress-track"><span data-validation-bar style="width: {{ validation.progress|default(0) }}%"></span></div>
+      <small data-validation-stage>{{ validation.stage }}</small>
+      <small>You can leave this page; the job and its result are saved locally.</small>
+    </div>
+    {% elif validation and validation.status == 'failed' %}
+    <div class="validation-complete fail">
+      <strong>Final validation failed to run</strong>
+      <small>{{ validation.error|default('Unknown validation error') }}</small>
+    </div>
+    <form class="validation-form" method="post" action="/api/strategies/{{ item.generation_id }}/{{ item.spec.trial_hash }}/finalize">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="external_dataset" value="{{ validation.external_dataset }}">
+      <button type="submit">Retry final validation</button>
+    </form>
+    {% elif item.generation_status == 'completed' and external_datasets %}
+    <form class="validation-form" method="post" action="/api/strategies/{{ item.generation_id }}/{{ item.spec.trial_hash }}/finalize">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Independent validation data
+        <select name="external_dataset" required>
+          {% for dataset in external_datasets %}<option value="{{ dataset }}">{{ dataset }}</option>{% endfor %}
+        </select>
+      </label>
+      <button type="submit">Run final validation</button>
+    </form>
+    {% elif item.generation_status != 'completed' %}
+    <p class="validation-blocked">Final validation unlocks after {{ item.generation_id }} completes.</p>
+    {% else %}
+    <p class="validation-blocked">Import a second, independently sourced broker CSV or Parquet into <code>var/data</code> to unlock final validation.</p>
+    {% endif %}
+    <details class="trial-parameters">
+      <summary>Strategy parameters</summary>
+      <div>{% for key, value in item.spec.parameters|dictsort %}<span><small>{{ key|replace('_', ' ') }}</small><strong>{{ value }}</strong></span>{% endfor %}</div>
+    </details>
+  </article>
+{% else %}
+  <article class="panel empty-state"><strong>No shortlisted strategies</strong><p>Complete a research generation first.</p></article>
+{% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,42 @@
+[app]
+name = "Aurum"
+environment = "development"
+host = "127.0.0.1"
+port = 8775
+timezone = "UTC"
+
+[account]
+currency = "USD"
+starting_equity = 10000.0
+
+[risk]
+max_risk_fraction = 0.005
+daily_loss_fraction = 0.02
+rolling_five_day_loss_fraction = 0.05
+peak_drawdown_fraction = 0.10
+max_positions = 1
+contract_size_oz = 100.0
+min_lot = 0.01
+lot_step = 0.01
+
+[simulation]
+spread_points = 0.30
+slippage_points = 0.10
+commission_per_lot_round_trip = 7.0
+swap_per_lot_day = -5.0
+
+[research]
+holdout_months = 12
+intraday_min_trades = 100
+swing_min_trades = 40
+min_profit_factor = 1.15
+min_sharpe = 0.75
+max_drawdown = 0.10
+min_profitable_fold_fraction = 0.60
+
+[live_paper]
+# One shared request every two minutes is 720/day, leaving headroom under an 800/day free cap.
+poll_seconds = 120
+stale_after_seconds = 180
+reconnect_initial_seconds = 10
+reconnect_max_seconds = 120

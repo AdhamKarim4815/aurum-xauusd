@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Live paper lab{% endblock %}
+{% block heading %}Four-strategy live paper lab{% endblock %}
+{% block content %}
+<section class="panel lab-warning" data-paper-lab>
+  <div>
+    <p class="eyebrow">EXPERIMENTAL · SIMULATED FILLS ONLY</p>
+    <h2>Four strategies, four isolated accounts</h2>
+  </div>
+  <p>This lab overrides only the final trade-count/activity gate. It can hold up to four simultaneous XAUUSD positions—one per strategy—with a separate $10,000 paper account and risk ledger for each. Results are not additive, and no real-order route exists.</p>
+</section>
+
+<section class="panel lab-control">
+  <div class="panel-head">
+    <div><p class="eyebrow">LAB CONTROL</p><h3>Shared live feed, independent decisions</h3></div>
+    <span id="lab-status" class="status-pill {{ lab.status or 'stopped' }}">{{ lab.status or 'stopped' }}</span>
+  </div>
+  <div class="metric-row six lab-summary">
+    <div><small>Strategies</small><strong>4</strong></div>
+    <div><small>Connection</small><strong id="lab-connection">{{ lab.connection_status or 'not started' }}</strong></div>
+    <div><small>Open positions</small><strong id="lab-open-positions">{{ lab.open_positions or 0 }} / 4</strong></div>
+    <div><small>Closed trades</small><strong id="lab-closed-trades">{{ lab.closed_trades or 0 }}</strong></div>
+    <div><small>Sleep lease</small><strong id="lab-sleep">{{ 'held' if lab.sleep_lease else 'released' }}</strong></div>
+    <div><small>Last poll</small><strong id="lab-last-poll">{{ lab.last_poll_at or 'not started' }}</strong></div>
+  </div>
+  <p id="lab-network-message" class="lab-network-message" {% if lab.status != 'paused-network' %}hidden{% endif %}>
+    Feed connection is unavailable. New entries are paused, existing paper positions are preserved,
+    and the worker will retry automatically{% if lab.next_retry_at %} at {{ lab.next_retry_at }}{% endif %}.
+    Recovery checks missing bars and never creates retroactive trades.
+  </p>
+  {% if lab.status in ['running', 'paused-network', 'error', 'recovery-required'] %}
+  <div class="control-actions lab-actions">
+    <form method="post" action="/api/paper-lab/stop">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Stop all safely</button>
+    </form>
+    <form method="post" action="/api/paper-lab/kill" data-confirm="Kill all four paper strategies immediately? Pending simulated entries will be cancelled and open paper positions closed at their last known marks.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="reason" value="Operator activated from four-strategy lab">
+      <button class="danger" type="submit">Kill all four</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+
+{% if lab.accounts %}
+<section class="lab-account-grid">
+{% for account in lab.accounts %}
+  <article class="panel lab-account" data-lab-account="{{ account.candidate_hash }}">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">{{ account.generation_id|default('GENERATION') }} · {{ account.timeframe|default('—') }}</p>
+        <h3>{{ account.variant_id|default(account.strategy_id)|replace('-', ' ') }}</h3>
+      </div>
+      <span class="status-pill {{ account.status or 'stopped' }}" data-lab-field="status">{{ account.status or 'stopped' }}</span>
+    </div>
+    <code>{{ account.candidate_hash }}</code>
+    <div class="mini-metrics lab-account-metrics">
+      <span>Equity <strong data-lab-field="equity">${{ '%.2f'|format(account.equity|default(10000, true)) }}</strong></span>
+      <span>Return <strong data-lab-field="return">{{ '%.2f'|format((account.equity|default(10000, true) / 10000 - 1) * 100) }}%</strong></span>
+      <span>Closed trades <strong data-lab-field="trades">{{ account.observation_trade_count or 0 }}</strong></span>
+      <span>Feed <strong data-lab-field="feed">{{ account.feed_status or 'not started' }}</strong></span>
+    </div>
+    <dl class="lab-details">
+      <dt>Position</dt><dd data-lab-field="position">{% if account.position %}{{ account.position.side }} {{ account.position.quantity_lots }} lots @ {{ account.position.entry_price }}{% else %}flat{% endif %}</dd>
+      <dt>Entries</dt><dd data-lab-field="entries">{{ 'allowed' if account.entries_allowed else 'blocked' }}</dd>
+      <dt>Quote age</dt><dd data-lab-field="quote-age">{{ '%.0f sec'|format(account.quote_age_seconds) if account.quote_age_seconds is defined else '—' }}</dd>
+      <dt>Risk state</dt><dd data-lab-field="risk">{{ account.risk_halt_reason or account.last_feed_error or 'clear' }}</dd>
+      <dt>Last decision bar</dt><dd data-lab-field="decision">{{ account.last_decision_bar or 'waiting' }}</dd>
+    </dl>
+  </article>
+{% endfor %}
+</section>
+{% endif %}
+
+<section class="research-intro generation-list">
+  <div><p class="eyebrow">STRATEGY SELECTION</p><h2>Select exactly four finalized strategies</h2></div>
+  <p>Only candidates that passed every final gate except trade count or monthly activity are offered. The top four discovery returns are preselected.</p>
+</section>
+
+<form method="post" action="/api/paper-lab/start" class="lab-start-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <section class="lab-select-grid">
+  {% for candidate in candidates %}
+    <label class="panel lab-choice">
+      <input type="checkbox" name="candidate_hashes" value="{{ candidate.candidate_hash }}" {% if loop.index <= 4 %}checked{% endif %} {% if lab.status in ['running', 'paused-network'] %}disabled{% endif %}>
+      <div class="panel-head">
+        <div><p class="eyebrow">#{{ loop.index }} · {{ candidate.generation_id }}</p><h3>{{ candidate.strategy_id }}</h3></div>
+        <span class="status-pill ineligible">override: {{ candidate.failed_gates|join(', ')|replace('_', ' ') }}</span>
+      </div>
+      <code>{{ candidate.candidate_hash }}</code>
+      <div class="mini-metrics lab-choice-metrics">
+        <span>Discovery <strong>{{ '%.2f'|format(candidate.discovery_metrics.net_return|default(0) * 100) }}%</strong></span>
+        <span>Final <strong>{{ '%.2f'|format(candidate.final_metrics.net_return|default(0) * 100) }}%</strong></span>
+        <span>Final trades <strong>{{ candidate.final_metrics.trade_count|default(0)|int }}</strong></span>
+        <span>Timeframe <strong>{{ candidate.timeframe }}</strong></span>
+      </div>
+      <details class="trial-parameters">
+        <summary>Exact parameters</summary>
+        <div>{% for key, value in candidate.parameters|dictsort %}<span><small>{{ key|replace('_', ' ') }}</small><strong>{{ value }}</strong></span>{% endfor %}</div>
+      </details>
+    </label>
+  {% else %}
+    <article class="panel empty-state"><strong>No strategies qualify for this lab</strong><p>Finalize strategies first. Return, cost, drawdown, and data-quality failures cannot be overridden.</p></article>
+  {% endfor %}
+  </section>
+  <section class="panel lab-acknowledgement">
+    <label><input type="checkbox" name="acknowledge" value="paper-only" required {% if lab.status in ['running', 'paused-network'] %}disabled{% endif %}> I understand these strategies failed the final activity requirement, this is simulation only, and paper results do not establish profitability.</label>
+    <button class="primary" type="submit" {% if candidates|length < 4 or lab.status in ['running', 'paused-network'] %}disabled{% endif %}>Start all four live paper strategies</button>
+  </section>
+</form>
+{% endblock %}

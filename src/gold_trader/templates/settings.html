@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block heading %}Safety configuration{% endblock %}
+{% block content %}
+<section class="settings-grid">
+  <article class="panel"><p class="eyebrow">ACCOUNT</p><h3>Paper capital</h3><dl><dt>Starting equity</dt><dd>${{ '%.2f'|format(configuration.starting_equity) }}</dd><dt>Currency</dt><dd>USD</dd><dt>Execution</dt><dd>Simulation only</dd></dl></article>
+  <article class="panel"><p class="eyebrow">RISK CEILINGS</p><h3>Cannot be raised in the UI</h3><dl><dt>Trade</dt><dd>{{ configuration.risk.max_risk_fraction * 100 }}%</dd><dt>Daily</dt><dd>{{ configuration.risk.daily_loss_fraction * 100 }}%</dd><dt>Five-day</dt><dd>{{ configuration.risk.rolling_five_day_loss_fraction * 100 }}%</dd><dt>Peak drawdown</dt><dd>{{ configuration.risk.peak_drawdown_fraction * 100 }}%</dd></dl></article>
+  <article class="panel wide"><p class="eyebrow">SECRETS</p><h3>macOS Keychain only</h3><p>Provider credentials are set through the CLI and are never returned to this dashboard, logged, or saved in configuration.</p></article>
+</section>
+{% endblock %}
+

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Audit{% endblock %}
+{% block heading %}Immutable audit trail{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-head"><div><p class="eyebrow">LATEST EVENTS</p><h2>Every safety decision has a cause.</h2></div><span>{{ events|length }} shown</span></div>
+  <div class="audit-table" role="table">
+    {% for event in events %}
+    <div class="audit-row" role="row"><time>{{ event.occurred_at }}</time><strong>{{ event.type }}</strong><code>{{ event.id[:12] }}</code><details><summary>Payload</summary><pre>{{ event.payload|tojson(indent=2) }}</pre></details></div>
+    {% else %}<div class="empty-state">No events recorded.</div>{% endfor %}
+  </div>
+</section>
+{% endblock %}
+
