@@ -2,6 +2,10 @@
 
 Aurum is a local, safety-first foundation for researching XAUUSD strategies and running approved candidates in paper mode on a MacBook. It contains no real-money execution venue and makes no claim that a strategy will be profitable.
 
+![Aurum evidence laboratory: a demo strategy candidate failing its own promotion gates on synthetic data](docs/screenshot-research.png)
+
+*The evidence laboratory on synthetic demo data. The candidate is ineligible because it fails four of its promotion gates, which is exactly what the gate is for.*
+
 ## Disclaimer
 
 This project is for educational and research purposes only. It is not investment advice, and nothing in it places orders: there is no broker connection or live execution path of any kind. Simulated results do not predict real trading outcomes, and no strategy here is claimed to be profitable. Use it at your own risk.
